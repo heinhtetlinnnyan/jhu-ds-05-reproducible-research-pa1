@@ -1,0 +1,118 @@
+---
+title: "Health and Economic Impacts of Severe Weather Events in the United States: 1950-2011"
+author: "Hein"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+#Synopsis
+
+
+This report analyzes the public health and economic impacts of severe weather events across the United States using data from the NOAA Storm Database spanning 1950 to 2011. This report focuses on number of deaths and injuries by weathers and how much these hurt the economy by looking into property and crop damage.
+We converted the coded damage letters into real numbers and added up the totals for each weather type. The results show that 
+For Tornadoes, Excessive Heat, Floods, Heat, Lightning are top 5 that cause death and injuries.
+For top 5 diasters acorss data,
+Floods cost us the most by far, causing a massive 150,319.7 million dollars in total damage. Hurricanes and Typhoons came in second, costing 71,913.7 million dollars. Tornadoes were third, costing us 57,362.3 million dollars. Storm Surges took a big chunk as well, costing 43,323.5 million dollars, and Hail rounded out the top five at 18,761.2 million dollars.
+
+```{r load-data, cache = TRUE}
+
+#read data
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+path <- "data/stormdata.bz2"
+
+if (!file.exists("data")) {
+        dir.create("data")
+}
+
+if (!file.exists(path)) {
+        download.file(url, path, method = "curl")
+}
+
+storm_data <- read.csv("data/stormdata.bz2", stringsAsFactors = FALSE)
+```
+#Across the United States, which types of events (as indicated in the #EVTYPE are most harmful with respect to population health?
+
+```{r}
+harmful_ph <- storm_data %>%
+        select(EVTYPE, FATALITIES, INJURIES) %>%
+        group_by(EVTYPE) %>% 
+        summarize(
+                Deaths = sum(FATALITIES, na.rm = FALSE),
+                Injuries = sum(INJURIES, na.rm = FALSE)
+        ) %>% 
+        arrange(desc(Deaths), desc(Injuries))
+
+head(harmful_ph, 5)
+
+top5_harm_ph <- harmful_ph %>% 
+        head(5) %>% 
+        arrange(desc(Deaths), desc(Injuries))
+        
+ggplot(top5_harm_ph, aes(x = reorder(EVTYPE, -Deaths), y = Deaths)) +
+        geom_bar(stat = "identity", fill = "blue") +
+        theme_classic() +
+        labs(
+                title = "Top 5 Death events by Weather events in the US (1950 - 2011)",
+                x = "Event Type",
+                y = "Total Number of Deaths"
+        )
+
+ggplot(top5_harm_ph, aes(x = reorder(EVTYPE, -Injuries), y = Injuries)) +
+        geom_bar(stat = "identity", fill = "wheat") +
+        theme_classic() +
+        labs(
+                title = "Top 5 Injuries events by Weather events in the US (1950 - 2011)",
+                x = "Event Type",
+                y = "Total Number of Injuries"
+        )
+```
+#Across the United States, which types of events have the greatest economic consequences?
+
+
+```{r}
+unique(storm_data$PROPDMGEXP)
+unique(storm_data$CROPDMGEXP)
+
+eco_conseq <- storm_data %>% 
+        select(EVTYPE, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP) %>% 
+        mutate(
+                prop_exp_clean = toupper(trimws(PROPDMGEXP)),
+                crop_exp_clean = toupper(trimws(CROPDMGEXP)),
+                
+                prop_mult = case_when(
+                        prop_exp_clean == "K" ~ 10^3,
+                        prop_exp_clean == "M" ~ 10^6,
+                        prop_exp_clean == "B" ~ 10^9,
+                        prop_exp_clean == "H" ~ 10^2,
+                        prop_exp_clean %in% as.character(0:8) ~ 10^as.numeric(prop_exp_clean),
+                        TRUE ~ 1
+                ),
+                crop_mult = case_when(
+                        crop_exp_clean == "K" ~ 10^3,
+                        crop_exp_clean == "M" ~ 10^6,
+                        crop_exp_clean == "B" ~ 10^9,
+                        crop_exp_clean == "H" ~ 10^2,
+                        crop_exp_clean %in% as.character(0:8) ~ 10^as.numeric(crop_exp_clean),
+                        TRUE ~ 1
+                ),
+                
+                prop_dmg = PROPDMG * prop_mult,
+                crop_dmg = CROPDMG * crop_mult,
+                total = prop_dmg + crop_dmg
+        )
+
+eco_summary <- eco_conseq %>%
+        group_by(EVTYPE) %>% 
+        summarise(
+                PropertyLossInMil = sum(prop_dmg, na.rm = TRUE)/ 10^6,
+                CropLossInMil = sum(crop_dmg, na.rm = TRUE)/ 10^6,
+                TotalinMil = sum(total, na.rm = TRUE)/ 10^6
+        ) %>% 
+        arrange(desc(TotalinMil))
+head(eco_summary, 5)
+```

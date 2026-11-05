@@ -1,0 +1,28 @@
+My first Rmarkdown file
+=====================
+
+this is my first R md file.
+here, we're goind to load some data.
+
+```{r}
+library(datasets)
+data("airquality")
+summary(airquality)
+```
+
+let's make a plot
+
+```{r}
+pairs(airquality)
+```
+
+here's a regrssion model o fozone on wind, solar radiation, and temperature.
+
+```{r, results = "asis"}
+library(stats)
+fit <- lm(Ozone ~ Wind + Solar.R + Temp, data = airquality)
+summary(fit)
+library(xtable)
+xt <- xtable(summary(fit))
+print(xt, type = "html")
+```
